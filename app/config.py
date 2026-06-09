@@ -4,7 +4,8 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+PROJECT_DIR = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
     openai_api_key: str
@@ -12,6 +13,12 @@ class Settings(BaseSettings):
     redis_url: str
     secret_key: str
     debug: bool = True
+    cors_origins: str = (
+        "http://localhost:3000,"
+        "http://127.0.0.1:3000,"
+        "http://localhost:5173,"
+        "http://127.0.0.1:5173"
+    )
     image_generation_enabled: bool = True
     image_provider: str = "pollinations"
     pollinations_api_key: str | None = None
@@ -47,6 +54,6 @@ class Settings(BaseSettings):
         return value
 
     class Config:
-        env_file = ROOT_DIR / ".env"
+        env_file = (PROJECT_DIR / ".env", BACKEND_DIR / ".env")
 
 settings = Settings()

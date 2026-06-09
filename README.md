@@ -36,6 +36,7 @@ DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/social_ai
 REDIS_URL=redis://localhost:6379/0
 SECRET_KEY=replace_with_a_secure_secret
 DEBUG=true
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 Start the API:
@@ -78,4 +79,5 @@ PUBLIC_APP_URL=
 - Deploy the contents of this `backend` folder as the backend repository.
 - Start command: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
 - Configure production `DATABASE_URL`, `REDIS_URL`, `OPENAI_API_KEY`, and `SECRET_KEY` in the hosting provider.
-- Update the frontend API URL and backend CORS settings for your deployed domains.
+- On Render, set `CORS_ORIGINS` to your frontend URL, for example `https://your-frontend.vercel.app`.
+- In the frontend Vercel project, set `VITE_API_BASE_URL` to your Render backend URL.
