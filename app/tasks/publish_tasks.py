@@ -22,7 +22,7 @@ def publish_due_posts() -> int:
         due_posts = (
             db.query(Post)
             .filter(Post.status == PostStatus.scheduled)
-            .filter(Post.scheduled_at <= datetime.now())
+            .filter(Post.scheduled_at <= datetime.utcnow())
             .order_by(Post.scheduled_at.asc())
             .all()
         )
@@ -53,7 +53,7 @@ def publish_due_posts() -> int:
                 else:
                     raise MetaPublishError(f"Publishing is not configured for {post.platform.value} yet.")
                 post.status = PostStatus.published
-                post.published_at = datetime.now()
+                post.published_at = datetime.utcnow()
                 post.external_post_id = result.get("external_post_id")
                 post.platform_post_url = result.get("platform_post_url")
                 post.error_log = None

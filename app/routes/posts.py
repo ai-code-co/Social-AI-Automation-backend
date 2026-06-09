@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.auth import decode_access_token, get_current_user
 from app.models import get_db, Platform, Post, PostStatus
 from app.models.brand import BrandSettings
@@ -28,6 +28,12 @@ class UpdatePostRequest(BaseModel):
     scheduled_at: Optional[datetime] = None
     status: Optional[PostStatus] = None
     brand_id: Optional[int] = None
+
+
+def to_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def get_brand_or_404(db: Session, brand_id: int, current_user: User) -> BrandSettings:
@@ -310,7 +316,7 @@ def update_post(
     if request.hashtags:
         post.hashtags = request.hashtags
     if request.scheduled_at:
-        post.scheduled_at = request.scheduled_at
+        post.scheduled_at = to_utc_naive(request.scheduled_at)
     if request.status:
         post.status = request.status
         if request.status != PostStatus.paused:
