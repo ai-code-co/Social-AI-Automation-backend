@@ -308,10 +308,11 @@ def google_oauth_callback(
                 hashed_password=hash_password(secrets.token_urlsafe(32)),
                 google_id=google_id,
                 auth_provider="google",
+                is_active=True,
             )
             db.add(user)
 
-    if not user.is_active:
+    if user.is_active is False:
         return render_google_message("Account disabled", "This account is disabled.")
 
     db.commit()
