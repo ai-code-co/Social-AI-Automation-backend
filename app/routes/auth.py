@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session
 from app.auth import create_access_token, decode_access_token, get_current_user, hash_password, verify_password
 from app.config import settings
 from app.models import get_db
+from app.models.brand import BrandSettings
+from app.models.post import Post
+from app.models.social_account import SocialAccount
 from app.models.user import User
 
 
@@ -205,6 +208,27 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
 def read_current_user(current_user: User = Depends(get_current_user)):
     return serialize_user(current_user)
 
+
+@router.delete("/me")
+def delete_current_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brand_ids = [
+        brand_id
+        for (brand_id,) in db.query(BrandSettings.id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .all()
+    ]
+
+    if brand_ids:
+        db.query(SocialAccount).filter(SocialAccount.brand_id.in_(brand_ids)).delete(synchronize_session=False)
+        db.query(Post).filter(Post.brand_id.in_(brand_ids)).delete(synchronize_session=False)
+        db.query(BrandSettings).filter(BrandSettings.id.in_(brand_ids)).delete(synchronize_session=False)
+
+    db.delete(current_user)
+    db.commit()
+    return {"message": "User profile deleted"}
 
 @router.get("/google/oauth-url")
 def get_google_oauth_url():
