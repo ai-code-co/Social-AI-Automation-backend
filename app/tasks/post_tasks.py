@@ -21,10 +21,10 @@ DEFAULT_TOPICS = [
 ]
 
 POSTING_SCHEDULE = {
-    Platform.instagram: {"days": ["mon", "wed", "fri"], "hour": 10},
-    Platform.facebook: {"days": ["tue", "thu", "sat"], "hour": 11},
-    Platform.linkedin: {"days": ["mon", "wed"], "hour": 9},
-    Platform.twitter: {"days": ["mon", "tue", "wed", "thu", "fri"], "hour": 8},
+    Platform.instagram: {"days": ["mon", "wed", "fri"], "hour": 17},
+    Platform.facebook: {"days": ["tue", "thu", "sat"], "hour": 17},
+    Platform.linkedin: {"days": ["mon", "wed"], "hour": 17},
+    Platform.twitter: {"days": ["mon", "tue", "wed", "thu", "fri"], "hour": 17},
 }
 
 

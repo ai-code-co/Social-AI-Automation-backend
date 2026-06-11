@@ -7,6 +7,8 @@ from app.auth import create_access_token
 from app.config import settings
 from app.models.post import Post
 from app.models.social_account import SocialAccount
+from app.services.image_service import ImageGenerationError, fetch_generated_image
+from app.services.post_image_refs import get_image_post_id
 
 
 class PublishError(Exception):
@@ -28,11 +30,13 @@ def _post_image_url(post: Post) -> str | None:
     if not settings.public_app_url:
         return None
 
+    image_post_id = get_image_post_id(post)
+
     image_token = create_access_token(
-        f"post_image:{post.id}",
+        f"post_image:{image_post_id}",
         expires_delta=timedelta(hours=6),
     )
-    publish_image_path = f"/posts/{post.id}/publish-image?token={quote(image_token, safe='')}"
+    publish_image_path = f"/posts/{image_post_id}/publish-image?token={quote(image_token, safe='')}"
     return urljoin(settings.public_app_url.rstrip("/") + "/", publish_image_path.lstrip("/"))
 
 
@@ -81,6 +85,34 @@ def _publish_facebook(post: Post, account: SocialAccount) -> dict:
     image_url = _post_image_url(post)
     caption = _caption(post)
 
+    if post.image_url and post.image_prompt:
+        endpoint = _graph_url(f"{account.account_id}/photos")
+        try:
+            image_content, media_type = fetch_generated_image(
+                post.image_prompt,
+                seed=get_image_post_id(post),
+            )
+        except ImageGenerationError as exc:
+            raise PublishError(f"Could not prepare Facebook image upload: {exc}") from exc
+
+        response = httpx.post(
+            endpoint,
+            data={
+                "caption": caption,
+                "access_token": account.access_token,
+            },
+            files={
+                "source": ("post-image.jpg", image_content, media_type),
+            },
+            timeout=120,
+        )
+        data = _raise_for_graph_error(response)
+        external_id = data.get("post_id") or data.get("id")
+        return {
+            "external_post_id": external_id,
+            "platform_post_url": _facebook_post_url(external_id),
+        }
+
     if image_url:
         endpoint = _graph_url(f"{account.account_id}/photos")
         payload = {
@@ -88,12 +120,26 @@ def _publish_facebook(post: Post, account: SocialAccount) -> dict:
             "caption": caption,
             "access_token": account.access_token,
         }
-    else:
-        endpoint = _graph_url(f"{account.account_id}/feed")
-        payload = {
-            "message": caption,
-            "access_token": account.access_token,
-        }
+        try:
+            response = httpx.post(endpoint, data=payload, timeout=60)
+            data = _raise_for_graph_error(response)
+            external_id = data.get("post_id") or data.get("id")
+            return {
+                "external_post_id": external_id,
+                "platform_post_url": _facebook_post_url(external_id),
+            }
+        except PublishError as exc:
+            message = str(exc).lower()
+            if "image" not in message and "photo" not in message:
+                raise
+
+            raise PublishError(f"Facebook image publish failed: {exc}") from exc
+
+    endpoint = _graph_url(f"{account.account_id}/feed")
+    payload = {
+        "message": caption,
+        "access_token": account.access_token,
+    }
 
     response = httpx.post(endpoint, data=payload, timeout=60)
     data = _raise_for_graph_error(response)

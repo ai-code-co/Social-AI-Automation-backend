@@ -4,6 +4,7 @@ from app.config import settings
 from app.models.post import Post
 from app.models.social_account import SocialAccount
 from app.services.image_service import ImageGenerationError, fetch_generated_image
+from app.services.post_image_refs import get_image_post_id
 
 
 class PublishError(Exception):
@@ -57,7 +58,10 @@ def _upload_image(post: Post, account: SocialAccount, author: str) -> str | None
         return None
 
     try:
-        image_content, media_type = fetch_generated_image(post.image_prompt, seed=post.id)
+        image_content, media_type = fetch_generated_image(
+            post.image_prompt,
+            seed=get_image_post_id(post),
+        )
     except ImageGenerationError:
         return None
 

@@ -18,14 +18,6 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # Also run every Monday at 9:00 AM for weekly batch
-    scheduler.add_job(
-        auto_generate_posts,
-        trigger=CronTrigger(day_of_week="mon", hour=9, minute=0),
-        id="weekly_post_generation",
-        replace_existing=True,
-    )
-
     scheduler.add_job(
         publish_due_posts,
         trigger=IntervalTrigger(minutes=1),

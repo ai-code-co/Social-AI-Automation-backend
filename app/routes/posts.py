@@ -30,6 +30,10 @@ class UpdatePostRequest(BaseModel):
     brand_id: Optional[int] = None
 
 
+class DuplicatePostRequest(BaseModel):
+    platforms: list[str]
+
+
 def to_utc_naive(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
@@ -297,6 +301,64 @@ def resume_post(
     db.commit()
     db.refresh(post)
     return {"message": f"Post {post_id} resumed", "post": post}
+
+
+@router.post("/{post_id}/duplicate")
+def duplicate_post(
+    post_id: int,
+    request: DuplicatePostRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    source_post = get_user_post_or_404(db, post_id, current_user)
+    brand = get_brand_or_404(db, source_post.brand_id, current_user)
+    enabled_platforms = get_enabled_platforms(brand)
+    requested_platforms = []
+    seen_platforms = set()
+
+    for raw_platform in request.platforms:
+        platform = raw_platform.strip().lower()
+        if not platform or platform in seen_platforms:
+            continue
+        if platform == source_post.platform.value:
+            raise HTTPException(status_code=400, detail=f"This post is already for {platform}.")
+        if platform not in enabled_platforms:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{brand.company_name} is not configured for {platform}.",
+            )
+        try:
+            requested_platforms.append(Platform(platform))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Unsupported platform: {platform}") from exc
+        seen_platforms.add(platform)
+
+    if not requested_platforms:
+        raise HTTPException(status_code=400, detail="Choose at least one platform to copy this post to.")
+
+    duplicated_posts = []
+    for platform in requested_platforms:
+        duplicated_post = Post(
+            brand_id=source_post.brand_id,
+            platform=platform,
+            caption=source_post.caption,
+            hashtags=source_post.hashtags,
+            image_prompt=source_post.image_prompt,
+            image_url=source_post.image_url,
+            status=PostStatus.draft,
+        )
+        db.add(duplicated_post)
+        duplicated_posts.append(duplicated_post)
+
+    db.commit()
+
+    for duplicated_post in duplicated_posts:
+        db.refresh(duplicated_post)
+
+    return {
+        "message": f"Copied post to {len(duplicated_posts)} platform(s)",
+        "posts": duplicated_posts,
+    }
 
 
 @router.put("/{post_id}")
