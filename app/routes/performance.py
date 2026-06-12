@@ -7,10 +7,14 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.models import get_db, Post, PostStatus
 from app.models.brand import BrandSettings
+from app.models.social_account import SocialAccount
 from app.models.user import User
+from app.services.meta_metrics import MetricsSyncError, sync_meta_post_metrics
 
 
 router = APIRouter(prefix="/performance", tags=["performance"])
+
+SYNC_PLATFORMS = {"facebook", "instagram"}
 
 
 def metric_value(value: int | None) -> int:
@@ -134,4 +138,94 @@ def get_performance_summary(
         "platforms": platforms,
         "posts": post_metrics,
         "top_posts": top_posts,
+    }
+
+
+@router.post("/sync")
+def sync_performance_metrics(
+    brand_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brands_query = db.query(BrandSettings).filter(BrandSettings.user_id == current_user.id)
+    if brand_id is not None:
+        brands_query = brands_query.filter(BrandSettings.id == brand_id)
+
+    brands = brands_query.all()
+    if brand_id is not None and not brands:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    brand_ids = [brand.id for brand in brands]
+    if not brand_ids:
+        return {"updated": 0, "failed": 0, "skipped": 0, "errors": []}
+
+    candidate_posts = (
+        db.query(Post)
+        .filter(Post.brand_id.in_(brand_ids))
+        .filter(Post.status == PostStatus.published)
+        .all()
+    )
+    missing_external_ids = [
+        {"post_id": post.id, "platform": post.platform.value}
+        for post in candidate_posts
+        if post.platform.value in SYNC_PLATFORMS and not post.external_post_id
+    ]
+
+    posts = (
+        db.query(Post)
+        .filter(Post.brand_id.in_(brand_ids))
+        .filter(Post.status == PostStatus.published)
+        .filter(Post.external_post_id.isnot(None))
+        .all()
+    )
+
+    accounts = (
+        db.query(SocialAccount)
+        .filter(SocialAccount.brand_id.in_(brand_ids))
+        .filter(SocialAccount.is_active.is_(True))
+        .all()
+    )
+    account_by_brand_platform = {
+        (account.brand_id, account.platform): account
+        for account in accounts
+    }
+
+    updated = 0
+    failed = 0
+    skipped = 0
+    errors = []
+
+    for post in posts:
+        platform = post.platform.value
+        if platform not in SYNC_PLATFORMS:
+            skipped += 1
+            continue
+
+        account = account_by_brand_platform.get((post.brand_id, platform))
+        if not account:
+            skipped += 1
+            continue
+
+        try:
+            metrics = sync_meta_post_metrics(post, account)
+        except MetricsSyncError as exc:
+            failed += 1
+            errors.append({"post_id": post.id, "platform": platform, "error": str(exc)})
+            continue
+
+        post.views_count = metrics["views_count"]
+        post.likes_count = metrics["likes_count"]
+        post.comments_count = metrics["comments_count"]
+        post.shares_count = metrics["shares_count"]
+        post.clicks_count = metrics["clicks_count"]
+        updated += 1
+
+    db.commit()
+
+    return {
+        "updated": updated,
+        "failed": failed,
+        "skipped": skipped + len(missing_external_ids),
+        "errors": errors[:10],
+        "missing_external_ids": missing_external_ids[:10],
     }
