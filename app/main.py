@@ -7,6 +7,7 @@ from app.routes.auth import router as auth_router
 from app.routes.posts import router as posts_router
 from app.routes.brand import router as brand_router
 from app.routes.social_accounts import router as social_accounts_router
+from app.routes.performance import router as performance_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ app.include_router(auth_router)
 app.include_router(posts_router)
 app.include_router(brand_router)
 app.include_router(social_accounts_router)
+app.include_router(performance_router)
 
 @app.get("/")
 def health_check():

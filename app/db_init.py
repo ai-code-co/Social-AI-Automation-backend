@@ -37,6 +37,11 @@ def init_db():
         if "status_before_pause" not in columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE posts ADD COLUMN status_before_pause VARCHAR(50)"))
+        metric_columns = ["views_count", "likes_count", "comments_count", "shares_count", "clicks_count"]
+        for column in metric_columns:
+            if column not in columns:
+                with engine.begin() as connection:
+                    connection.execute(text(f"ALTER TABLE posts ADD COLUMN {column} INTEGER DEFAULT 0"))
 
     if inspector.has_table("brand_settings"):
         columns = {column["name"] for column in inspector.get_columns("brand_settings")}
