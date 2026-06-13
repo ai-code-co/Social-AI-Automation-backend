@@ -6,6 +6,7 @@ from app.models import get_db
 from app.models.brand import BrandSettings
 from app.models.post import Platform, Post
 from app.models.user import User
+from app.models.social_account import SocialAccount
 
 router = APIRouter(tags=["brands"])
 
@@ -113,13 +114,9 @@ def delete_brand(
 ):
     brand = get_user_brand_or_404(db, brand_id, current_user)
 
-    post_count = db.query(Post).filter(Post.brand_id == brand_id).count()
-    if post_count:
-        raise HTTPException(
-            status_code=400,
-            detail="This business has posts. Delete or reassign its posts before deleting the business.",
-        )
-
+    # Cascade delete related data
+    db.query(SocialAccount).filter(SocialAccount.brand_id == brand_id).delete(synchronize_session=False)
+    db.query(Post).filter(Post.brand_id == brand_id).delete(synchronize_session=False)
     db.delete(brand)
     db.commit()
     return {"message": f"Business {brand_id} deleted"}

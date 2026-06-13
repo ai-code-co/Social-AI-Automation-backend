@@ -691,6 +691,7 @@ def get_meta_oauth_url(
         "pages_read_engagement",
         "pages_show_list",
         "business_management",
+        "read_insights",
     ]
     params = urlencode(
         {
