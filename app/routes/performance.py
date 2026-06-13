@@ -226,6 +226,6 @@ def sync_performance_metrics(
         "updated": updated,
         "failed": failed,
         "skipped": skipped + len(missing_external_ids),
-        "errors": errors[:10],
+        "errors": errors,
         "missing_external_ids": missing_external_ids[:10],
     }

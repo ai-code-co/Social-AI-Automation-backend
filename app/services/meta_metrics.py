@@ -66,7 +66,7 @@ def _sync_facebook_metrics(post: Post, account: SocialAccount) -> dict:
     object_response = httpx.get(
         _graph_url(post.external_post_id),
         params={
-            "fields": "shares,comments.summary(true).limit(0),reactions.summary(true).limit(0),likes.summary(true).limit(0)",
+            "fields": "shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
             "access_token": account.access_token,
         },
         timeout=30,
@@ -74,8 +74,6 @@ def _sync_facebook_metrics(post: Post, account: SocialAccount) -> dict:
     object_data = _raise_for_meta_error(object_response)
 
     reactions_count = int(((object_data.get("reactions") or {}).get("summary") or {}).get("total_count") or 0)
-    likes_edge_count = int(((object_data.get("likes") or {}).get("summary") or {}).get("total_count") or 0)
-    likes_count = max(reactions_count, likes_edge_count)
     comments_count = int(((object_data.get("comments") or {}).get("summary") or {}).get("total_count") or 0)
     shares_count = int((object_data.get("shares") or {}).get("count") or 0)
     views_count = 0
@@ -99,7 +97,7 @@ def _sync_facebook_metrics(post: Post, account: SocialAccount) -> dict:
 
     return {
         "views_count": views_count,
-        "likes_count": likes_count,
+        "likes_count": reactions_count,
         "comments_count": comments_count,
         "shares_count": shares_count,
         "clicks_count": clicks_count,
