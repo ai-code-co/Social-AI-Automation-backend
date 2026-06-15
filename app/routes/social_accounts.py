@@ -700,6 +700,7 @@ def get_meta_oauth_url(
             "state": state,
             "scope": ",".join(scopes),
             "response_type": "code",
+            "auth_type": "rerequest",
         }
     )
     return {
@@ -1169,7 +1170,7 @@ def meta_oauth_callback(
             "id": page["id"],
             "name": page["name"],
             "access_token": page_access_token,
-            "scopes": "pages_manage_posts,pages_read_engagement,pages_show_list",
+            "scopes": "pages_manage_posts,pages_read_engagement,pages_show_list,business_management,read_insights",
             "token_expires_at": token_expires_at,
         }
         page["page_token"] = create_access_token(

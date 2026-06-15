@@ -63,19 +63,28 @@ def _sync_facebook_metrics(post: Post, account: SocialAccount) -> dict:
     if not post.external_post_id:
         raise MetricsSyncError("Post does not have a Facebook post ID.")
 
-    object_response = httpx.get(
-        _graph_url(post.external_post_id),
-        params={
-            "fields": "shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
-            "access_token": account.access_token,
-        },
-        timeout=30,
-    )
-    object_data = _raise_for_meta_error(object_response)
+    reactions_count = 0
+    comments_count = 0
+    shares_count = 0
 
-    reactions_count = int(((object_data.get("reactions") or {}).get("summary") or {}).get("total_count") or 0)
-    comments_count = int(((object_data.get("comments") or {}).get("summary") or {}).get("total_count") or 0)
-    shares_count = int((object_data.get("shares") or {}).get("count") or 0)
+    try:
+        object_response = httpx.get(
+            _graph_url(post.external_post_id),
+            params={
+                "fields": "shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
+                "access_token": account.access_token,
+            },
+            timeout=30,
+        )
+        object_data = _raise_for_meta_error(object_response)
+        reactions_count = int(((object_data.get("reactions") or {}).get("summary") or {}).get("total_count") or 0)
+        comments_count = int(((object_data.get("comments") or {}).get("summary") or {}).get("total_count") or 0)
+        shares_count = int((object_data.get("shares") or {}).get("count") or 0)
+    except MetricsSyncError as exc:
+        # If we don't have pages_read_engagement permission, still try to get insights
+        if "pages_read_engagement" not in str(exc):
+            raise
+
     views_count = 0
     clicks_count = 0
 
