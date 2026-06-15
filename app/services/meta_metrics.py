@@ -88,21 +88,17 @@ def _sync_facebook_metrics(post: Post, account: SocialAccount) -> dict:
     views_count = 0
     clicks_count = 0
 
-    try:
-        insights_response = httpx.get(
-            _graph_url(f"{post.external_post_id}/insights"),
-            params={
-                "metric": "post_impressions,post_clicks",
-                "access_token": account.access_token,
-            },
-            timeout=30,
-        )
-        insights_data = _raise_for_meta_error(insights_response)
-        views_count = _insight_value(insights_data, "post_impressions")
-        clicks_count = _insight_value(insights_data, "post_clicks")
-    except MetricsSyncError:
-        views_count = 0
-        clicks_count = 0
+    insights_response = httpx.get(
+        _graph_url(f"{post.external_post_id}/insights"),
+        params={
+            "metric": "post_impressions,post_clicks",
+            "access_token": account.access_token,
+        },
+        timeout=30,
+    )
+    insights_data = _raise_for_meta_error(insights_response)
+    views_count = _insight_value(insights_data, "post_impressions")
+    clicks_count = _insight_value(insights_data, "post_clicks")
 
     return {
         "views_count": views_count,
