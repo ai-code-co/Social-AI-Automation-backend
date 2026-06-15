@@ -50,6 +50,31 @@ def _insight_value(data: dict, metric_name: str) -> int:
     return 0
 
 
+def _is_invalid_metric_error(exc: MetricsSyncError) -> bool:
+    message = str(exc).lower()
+    return "valid insights metric" in message or ("(#100)" in message and "metric" in message)
+
+
+def _facebook_insight_value(post: Post, account: SocialAccount, metric_names: list[str]) -> int:
+    for metric_name in metric_names:
+        try:
+            insights_response = httpx.get(
+                _graph_url(f"{post.external_post_id}/insights"),
+                params={
+                    "metric": metric_name,
+                    "access_token": account.access_token,
+                },
+                timeout=30,
+            )
+            insights_data = _raise_for_meta_error(insights_response)
+            return _insight_value(insights_data, metric_name)
+        except MetricsSyncError as exc:
+            if _is_invalid_metric_error(exc):
+                continue
+            raise
+    return 0
+
+
 def sync_meta_post_metrics(post: Post, account: SocialAccount) -> dict:
     platform = account.platform.lower()
     if platform == "facebook":
@@ -88,17 +113,16 @@ def _sync_facebook_metrics(post: Post, account: SocialAccount) -> dict:
     views_count = 0
     clicks_count = 0
 
-    insights_response = httpx.get(
-        _graph_url(f"{post.external_post_id}/insights"),
-        params={
-            "metric": "post_impressions,post_clicks",
-            "access_token": account.access_token,
-        },
-        timeout=30,
+    views_count = _facebook_insight_value(
+        post,
+        account,
+        ["post_impressions", "post_impressions_unique", "post_engaged_users"],
     )
-    insights_data = _raise_for_meta_error(insights_response)
-    views_count = _insight_value(insights_data, "post_impressions")
-    clicks_count = _insight_value(insights_data, "post_clicks")
+    clicks_count = _facebook_insight_value(
+        post,
+        account,
+        ["post_clicks", "post_clicks_unique"],
+    )
 
     return {
         "views_count": views_count,
